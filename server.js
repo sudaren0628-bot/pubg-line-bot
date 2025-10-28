@@ -17,7 +17,39 @@ app.post("/callback", async (req, res) => {
         const userMessage = event.message.text.trim();
 
         let replyText = "";
+// ===== 画像メッセージ処理 =====
+if (event.message.type === "image") {
+  const axios = require("axios");
+  const vision = require("@google-cloud/vision");
 
+  // LINEサーバーから画像取得
+  const url = `https://api-data.line.me/v2/bot/message/${event.message.id}/content`;
+  const response = await axios.get(url, {
+    responseType: "arraybuffer",
+    headers: { Authorization: `Bearer ${CHANNEL_ACCESS_TOKEN}` },
+  });
+
+  // Vision API クライアント設定
+  const client = new vision.ImageAnnotatorClient({
+    keyFilename: "/etc/secrets/key.json",
+  });
+
+  // 画像の文字認識
+  const [result] = await client.textDetection({ image: { content: response.data } });
+  const detections = result.textAnnotations;
+
+  let replyText = detections.length > 0
+    ? `📸 読み取り結果:\n${detections[0].description}`
+    : "画像から文字を検出できませんでした。";
+
+  // 結果を返信
+  await axios.post("https://api.line.me/v2/bot/message/reply", {
+    replyToken: event.replyToken,
+    messages: [{ type: "text", text: replyText }],
+  }, {
+    headers: { Authorization: `Bearer ${CHANNEL_ACCESS_TOKEN}` },
+  });
+}
         // ===== コマンド判定 =====
         if (userMessage === "戦績") {
           replyText = "📊 戦績データを取得中...";
