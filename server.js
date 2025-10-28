@@ -3,7 +3,10 @@ const express = require("express");
 const axios = require("axios");
 const app = express();
 app.use(express.json());
-
+const vision = require('@google-cloud/vision');
+const client = new vision.ImageAnnotatorClient({
+  keyFilename: './pubg-line-bot-dbfddc448390.json' // ← あなたのJSONファイル名に合わせる
+});
 // 環境変数から読み込み
 const CHANNEL_ACCESS_TOKEN = process.env.CHANNEL_ACCESS_TOKEN;
 
