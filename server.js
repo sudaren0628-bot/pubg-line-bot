@@ -12,14 +12,20 @@ const CHANNEL_ACCESS_TOKEN = process.env.CHANNEL_ACCESS_TOKEN;
 
 // ===== Webhook受信 =====
 app.post("/callback", async (req, res) => {
-  res.status(200).send("OK");
   try {
     const events = req.body.events || [];
-    for (const event of events) {
-      if (event.type === "message" && event.message.type === "text") {
-        const userMessage = event.message.text.trim();
 
-        let replyText = "";
+    for (const event of events) {
+      // ここで各イベントを処理（必要ならここに処理を書く）
+    }
+
+    // ✅ for文の外に配置
+    res.status(200).send("OK");
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("Error");
+  }
+});
 // ===== 画像メッセージ処理 =====
 if (event.message.type === "image") {
   const axios = require("axios");
