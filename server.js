@@ -9,6 +9,7 @@ const CHANNEL_ACCESS_TOKEN = process.env.CHANNEL_ACCESS_TOKEN;
 
 // ===== Webhook受信 =====
 app.post("/callback", async (req, res) => {
+  res.status(200).send("OK");
   try {
     const events = req.body.events || [];
     for (const event of events) {
