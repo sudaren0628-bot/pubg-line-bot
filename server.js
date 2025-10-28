@@ -8,7 +8,7 @@ app.use(express.json());
 
 // ===== Google Vision 設定 =====
 const client = new vision.ImageAnnotatorClient({
-  keyFilename: "./pubg-line-bot-dbfddc448390.json", // あなたのJSONファイル名に合わせる
+  keyFilename: '/etc/secrets/key.json' // ← 修正版（Render用）
 });
 
 // ===== 環境変数から読み込み =====
