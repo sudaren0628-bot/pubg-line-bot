@@ -68,7 +68,7 @@ app.post("/callback", async (req, res) => {
               base64Image: `data:image/jpeg;base64,${Buffer.from(
                 imageResponse.data
               ).toString("base64")}`,
-              language: "jpn",
+              language: "jpn,eng",
             },
             { headers: { "Content-Type": "application/json" } }
           );
