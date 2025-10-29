@@ -1,4 +1,4 @@
-// ===== PUBG Report Bot (for LINE + OCR.Space) =====
+// ===== PUBG Report Bot (for LINE + OCR.Space 強化版) =====
 const express = require("express");
 const axios = require("axios");
 const app = express();
@@ -13,7 +13,7 @@ app.post("/callback", async (req, res) => {
     const events = req.body.events || [];
 
     for (const event of events) {
-      // テキストメッセージ処理
+      // ===== テキストメッセージ処理 =====
       if (event.type === "message" && event.message.type === "text") {
         const userMessage = event.message.text.trim();
         let replyText = "";
@@ -31,7 +31,7 @@ app.post("/callback", async (req, res) => {
           replyText = `受け取りました: ${userMessage}`;
         }
 
-        // LINEに返信
+        // ===== LINE返信 =====
         await axios.post(
           "https://api.line.me/v2/bot/message/reply",
           {
@@ -48,7 +48,7 @@ app.post("/callback", async (req, res) => {
         console.log("✅ テキスト返信成功！");
       }
 
-      // 画像メッセージ処理
+      // ===== 画像メッセージ処理 =====
       if (event.type === "message" && event.message.type === "image") {
         try {
           console.log("📥 画像受信、OCR.Spaceで解析開始...");
@@ -63,17 +63,23 @@ app.post("/callback", async (req, res) => {
           // base64変換
           const base64Image = Buffer.from(response.data).toString("base64");
 
-          // OCR.Space API 呼び出し
+          // ===== OCR.Space API呼び出し =====
           const ocrResponse = await axios.post(
             "https://api.ocr.space/parse/image",
             new URLSearchParams({
               apikey: "K88193345788957", // ← あなたのOCR.Space APIキー
               base64Image: `data:image/jpeg;base64,${base64Image}`,
-              language: "jpn,eng", // 日本語＋英語対応
+              language: "jpn,eng",           // 日本語＋英語両対応
+              isOverlayRequired: "false",    // 位置情報不要
+              scale: "true",                 // スケーリングON（精度UP）
+              OCREngine: "2",                // 高精度エンジン
+              detectOrientation: "true",     // 回転補正
+              isTable: "true",               // 表形式最適化（戦績UI対策）
             }),
             { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
           );
 
+          // OCR結果抽出
           const detections =
             ocrResponse.data.ParsedResults?.[0]?.ParsedText || "";
 
@@ -82,7 +88,7 @@ app.post("/callback", async (req, res) => {
               ? `📸 読み取り結果:\n${detections}`
               : "画像から文字を検出できませんでした。";
 
-          // LINEへ結果返信
+          // ===== LINEへ結果返信 =====
           await axios.post(
             "https://api.line.me/v2/bot/message/reply",
             {
