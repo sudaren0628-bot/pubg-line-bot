@@ -4,11 +4,8 @@ const axios = require("axios");
 const app = express();
 app.use(express.json());
 
-// ===== 環境変数から読み込み =====
+// ===== 環境変数 =====
 const CHANNEL_ACCESS_TOKEN = process.env.CHANNEL_ACCESS_TOKEN;
-
-// ===== OCR.Space 設定 =====
-const OCR_API_KEY = "K88193345788957"; // ← あなたのOCR.Space APIキー
 
 // ===== Webhook受信 =====
 app.post("/callback", async (req, res) => {
@@ -16,11 +13,12 @@ app.post("/callback", async (req, res) => {
     const events = req.body.events || [];
 
     for (const event of events) {
-      // ===== テキストメッセージ =====
+      // テキストメッセージ処理
       if (event.type === "message" && event.message.type === "text") {
         const userMessage = event.message.text.trim();
         let replyText = "";
 
+        // コマンド判定
         if (userMessage === "戦績") {
           replyText = "📊 戦績データを取得中...";
         } else if (userMessage.startsWith("K/")) {
@@ -33,6 +31,7 @@ app.post("/callback", async (req, res) => {
           replyText = `受け取りました: ${userMessage}`;
         }
 
+        // LINEに返信
         await axios.post(
           "https://api.line.me/v2/bot/message/reply",
           {
@@ -46,45 +45,49 @@ app.post("/callback", async (req, res) => {
             },
           }
         );
-
         console.log("✅ テキスト返信成功！");
       }
 
-      // ===== 画像メッセージ =====
-      if (event.message.type === "image") {
+      // 画像メッセージ処理
+      if (event.type === "message" && event.message.type === "image") {
         try {
-          // 1️⃣ LINEサーバーから画像取得
+          console.log("📥 画像受信、OCR.Spaceで解析開始...");
+
+          // LINEサーバーから画像取得
           const url = `https://api-data.line.me/v2/bot/message/${event.message.id}/content`;
-          const imageResponse = await axios.get(url, {
+          const response = await axios.get(url, {
             responseType: "arraybuffer",
             headers: { Authorization: `Bearer ${CHANNEL_ACCESS_TOKEN}` },
           });
 
-          // 2️⃣ OCR.Spaceに送信
+          // base64変換
+          const base64Image = Buffer.from(response.data).toString("base64");
+
+          // OCR.Space API 呼び出し
           const ocrResponse = await axios.post(
             "https://api.ocr.space/parse/image",
-            {
-              apikey: OCR_API_KEY,
-              base64Image: `data:image/jpeg;base64,${Buffer.from(
-                imageResponse.data
-              ).toString("base64")}`,
-              language: "jpn,eng",
-            },
-            { headers: { "Content-Type": "application/json" } }
+            new URLSearchParams({
+              apikey: "K88193345788957", // ← あなたのOCR.Space APIキー
+              base64Image: `data:image/jpeg;base64,${base64Image}`,
+              language: "jpn,eng", // 日本語＋英語対応
+            }),
+            { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
           );
 
-          // 3️⃣ 結果抽出
-          const parsedText =
-            ocrResponse.data?.ParsedResults?.[0]?.ParsedText || "文字を検出できませんでした。";
+          const detections =
+            ocrResponse.data.ParsedResults?.[0]?.ParsedText || "";
 
-          // 4️⃣ 結果返信
+          let replyText =
+            detections.trim().length > 0
+              ? `📸 読み取り結果:\n${detections}`
+              : "画像から文字を検出できませんでした。";
+
+          // LINEへ結果返信
           await axios.post(
             "https://api.line.me/v2/bot/message/reply",
             {
               replyToken: event.replyToken,
-              messages: [
-                { type: "text", text: `📸 OCR読み取り結果:\n${parsedText}` },
-              ],
+              messages: [{ type: "text", text: replyText }],
             },
             {
               headers: {
