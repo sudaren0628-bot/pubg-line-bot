@@ -1,18 +1,14 @@
-// ===== PUBG Report Bot (for LINE) =====
+// ===== PUBG Report Bot (for LINE + OCR.Space) =====
 const express = require("express");
 const axios = require("axios");
-const vision = require("@google-cloud/vision");
-
 const app = express();
 app.use(express.json());
 
-// ===== Google Vision 設定 =====
-const client = new vision.ImageAnnotatorClient({
-  keyFilename: '/etc/secrets/key.json' // ← 修正版（Render用）
-});
-
 // ===== 環境変数から読み込み =====
 const CHANNEL_ACCESS_TOKEN = process.env.CHANNEL_ACCESS_TOKEN;
+
+// ===== OCR.Space 設定 =====
+const OCR_API_KEY = "K88193345788957"; // ← あなたのOCR.Space APIキー
 
 // ===== Webhook受信 =====
 app.post("/callback", async (req, res) => {
@@ -20,12 +16,11 @@ app.post("/callback", async (req, res) => {
     const events = req.body.events || [];
 
     for (const event of events) {
-      // ===== テキストメッセージ処理 =====
+      // ===== テキストメッセージ =====
       if (event.type === "message" && event.message.type === "text") {
         const userMessage = event.message.text.trim();
         let replyText = "";
 
-        // コマンド判定
         if (userMessage === "戦績") {
           replyText = "📊 戦績データを取得中...";
         } else if (userMessage.startsWith("K/")) {
@@ -38,7 +33,6 @@ app.post("/callback", async (req, res) => {
           replyText = `受け取りました: ${userMessage}`;
         }
 
-        // LINEに返信
         await axios.post(
           "https://api.line.me/v2/bot/message/reply",
           {
@@ -56,31 +50,41 @@ app.post("/callback", async (req, res) => {
         console.log("✅ テキスト返信成功！");
       }
 
-      // ===== 画像メッセージ処理 =====
-      if (event.type === "message" && event.message.type === "image") {
+      // ===== 画像メッセージ =====
+      if (event.message.type === "image") {
         try {
-          // LINEサーバーから画像取得
+          // 1️⃣ LINEサーバーから画像取得
           const url = `https://api-data.line.me/v2/bot/message/${event.message.id}/content`;
-          const response = await axios.get(url, {
+          const imageResponse = await axios.get(url, {
             responseType: "arraybuffer",
             headers: { Authorization: `Bearer ${CHANNEL_ACCESS_TOKEN}` },
           });
 
-          // Google Vision OCR
-          const [result] = await client.textDetection(response.data);
-          const detections = result.textAnnotations;
+          // 2️⃣ OCR.Spaceに送信
+          const ocrResponse = await axios.post(
+            "https://api.ocr.space/parse/image",
+            {
+              apikey: OCR_API_KEY,
+              base64Image: `data:image/jpeg;base64,${Buffer.from(
+                imageResponse.data
+              ).toString("base64")}`,
+              language: "jpn",
+            },
+            { headers: { "Content-Type": "application/json" } }
+          );
 
-          const replyText =
-            detections.length > 0
-              ? `📸 読み取り結果:\n${detections[0].description}`
-              : "画像から文字を検出できませんでした。";
+          // 3️⃣ 結果抽出
+          const parsedText =
+            ocrResponse.data?.ParsedResults?.[0]?.ParsedText || "文字を検出できませんでした。";
 
-          // OCR結果を返信
+          // 4️⃣ 結果返信
           await axios.post(
             "https://api.line.me/v2/bot/message/reply",
             {
               replyToken: event.replyToken,
-              messages: [{ type: "text", text: replyText }],
+              messages: [
+                { type: "text", text: `📸 OCR読み取り結果:\n${parsedText}` },
+              ],
             },
             {
               headers: {
@@ -90,17 +94,17 @@ app.post("/callback", async (req, res) => {
             }
           );
 
-          console.log("📷 画像読み取り成功！");
+          console.log("✅ 画像OCR処理成功！");
         } catch (err) {
           console.error("❌ 画像処理エラー:", err.message);
         }
       }
     }
 
-    res.sendStatus(200);
-  } catch (err) {
-    console.error("❌ 全体エラー:", err.message);
-    res.sendStatus(500);
+    res.status(200).send("OK");
+  } catch (error) {
+    console.error("❌ 全体エラー:", error.message);
+    res.status(500).send("Error");
   }
 });
 
